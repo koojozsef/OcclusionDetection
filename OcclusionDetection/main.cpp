@@ -84,6 +84,18 @@ public:
         x = image_resolution_px[0];
         y = image_resolution_px[1];
     }
+    bool IsPinholeModel(){
+        return model == false; //'false' - opencv_pinhole
+    }
+    bool IsMeiModel(){
+        return model == true; //'true' - mei
+    }
+    void GetParameters(float& fx, float& fy, float& u0, float& v0){
+        fx = focal_length_px[0];
+        fy = focal_length_px[1];
+        u0 = principal_point_px[0];
+        v0 = principal_point_px[1];
+    }
 };
 
 void LoadPoints(string pointPath, vector<glm::vec3>& points_out)
@@ -115,8 +127,14 @@ void LoadPoints(string pointPath, vector<glm::vec3>& points_out)
 */
 void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, std::vector<glm::vec3>& out_pts_visible, std::vector<int32_t>& out_idx)
 {
-    cout << "this is the body of filter method" << endl;
+    cout << "Filtering method started..." << endl;
     //TODO: apply occlusion algorithm
+    if(camera_model.IsPinholeModel()){
+        //Calibration matrix
+        float fx, fy, u0, v0;
+        camera_model.GetParameters(fx,fy,u0,v0);
+        glm::mat4x3 CalibrationMatrix = glm::mat4x3(glm::vec3(fx, 0.0f, 0.0f), glm::vec3(0.0f,fy,0.0f), glm::vec3(u0,v0,1.0f), glm::vec3(0.0f));
+    }
 }
 
 int main()
