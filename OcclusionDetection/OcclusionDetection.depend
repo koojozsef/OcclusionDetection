@@ -1,12 +1,9 @@
 # depslib dependency file v1.0
-1617619037 source:d:\joci\projects\aimotive\obstacle detection\occlusiondetection\main.cpp
+1617695663 source:d:\joci\projects\aimotive\obstacle detection\occlusiondetection\main.cpp
 	<iostream>
-	<vector>
-	<GL/glew.h>
+	<fstream>
 	<glm/glm.hpp>
-	<glm/gtc/matrix_transform.hpp>
-	<glm/gtc/type_ptr.hpp>
-	<SFML/Graphics.hpp>
+	<vector>
 
 1525812018 d:\joci\c++\_libraries\sfml-2.5.1\include\sfml\graphics.hpp
 	<SFML/Window.hpp>
