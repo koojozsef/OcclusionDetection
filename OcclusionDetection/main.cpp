@@ -77,6 +77,7 @@ public:
                 reprojection_error = stod(myText);
             }
         }
+        MyReadFile.close();
     }
 
     void GetResolution(uint16_t& x, uint16_t&y){
@@ -84,15 +85,34 @@ public:
         y = image_resolution_px[1];
     }
 };
-/**
-@params pts_view : points in view coords (should only contain points in frustum, so that only needed
-points are in it)
-@params camera_model : intrinsic calibration of the camera
-...
-@params out_pts_visible : points visible after filter (in view, output)
-@params out_idx : kept point indexes (output)
-@return none
-**/
+
+void LoadPoints(string pointPath, vector<glm::vec3>& points_out)
+{
+    cout << "Points are loading..." << endl;
+    bool startParse = false;
+    string myText;
+    ifstream MyReadFile(pointPath);
+    float x, y, z;
+    while (getline (MyReadFile, myText)) {
+        if(startParse){
+            x = stof(myText.substr(0, myText.find(" ")));
+            myText = myText.erase(0, myText.find(" ")+1);
+            y = stof(myText.substr(0, myText.find(" ")));
+            myText = myText.erase(0, myText.find(" ")+1);
+            z = stof(myText.substr(0, myText.find(" ")));
+            points_out.push_back(glm::vec3(x,y,z));
+        }
+        if(myText == "end_header"){startParse = true;}
+    }
+}
+
+/** \brief
+* \param pts_view : points in view coords (should only contain points in frustum, so that only needed points are in it)
+* \param camera_model : intrinsic calibration of the camera
+* \param out_pts_visible : points visible after filter (in view, output)
+* \param out_idx : kept point indexes (output)
+* \return none
+*/
 void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, std::vector<glm::vec3>& out_pts_visible, std::vector<int32_t>& out_idx)
 {
     cout << "this is the body of filter method" << endl;
@@ -101,15 +121,26 @@ void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, s
 
 int main()
 {
-    // TODO create CameraModell class
-    // TODO: read points
-    // TODO: read camera model
-    string path = "D:/joci/projects/AImotive/Obstacle detection/Description/research_scientist_obstacle_data/calibration/";
-    string calibPath = path + CameraNames[0] + ".yaml";
-    CameraModel test(calibPath);
-    uint16_t x,y = 0;
-    test.GetResolution(x,y);
+    // general path definition
+    string path = "D:/joci/projects/AImotive/Obstacle detection/Description/research_scientist_obstacle_data/";
 
-    cout << x << endl;
+    //camera model read
+    string calibPath = path + "calibration/" + CameraNames[0] + ".yaml";
+    CameraModel cameraModel(calibPath);
+    uint16_t x,y = 0;
+    cameraModel.GetResolution(x,y);
+    cout << "Cameramodel loaded with resolution of: " << x << "x" << y << endl;
+
+    //read points
+    string pointPath = path + "viewpoints/" + CameraNames[0] + "/00006526_viewpts.ply";
+    vector<glm::vec3> points;
+    LoadPoints(pointPath, points);
+    cout << "The number of points loaded: " << points.size() << endl;
+
+    //apply occlusion algorithm
+    std::vector<glm::vec3> visiblePoints;
+    std::vector<int32_t> visiblePoints_idx;
+    filter(points, cameraModel, visiblePoints, visiblePoints_idx);
+
     return 0;
 }
