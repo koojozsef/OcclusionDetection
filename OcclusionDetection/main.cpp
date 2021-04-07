@@ -2,6 +2,7 @@
 #include <fstream>
 #include <glm/glm.hpp>
 #include <vector>
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -13,6 +14,14 @@ const std::string CameraNames[8]={"B_FISHEYE_C",
                             "M_FISHEYE_R",
                             "M_WINGMIRROR_L",
                             "M_WINGMIRROR_R"};
+
+struct MyPoint{
+        int idx;
+        float z_value;
+};
+
+
+
 
 class CameraModel{
 private:
@@ -115,8 +124,31 @@ void LoadPoints(string pointPath, vector<glm::vec3>& points_out)
 */
 void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, std::vector<glm::vec3>& out_pts_visible, std::vector<int32_t>& out_idx)
 {
-    cout << "this is the body of filter method" << endl;
-    //TODO: apply occlusion algorithm
+    std::map<std::pair<int, int>, int > mapOfPoints;
+    int resolution_x = 1000;
+    int resolution_y = 1000;
+    bool itr;
+    float inverse_z = 0.0f;
+    int idx_x = 0;
+    int idx_y = 0;
+    int i = 0;
+    int x_max = 0;
+    cout << "Computation started..." << endl;
+    for(glm::vec3 item : pts_view){
+        inverse_z = 1/item.z;
+        idx_x = int(item.x*inverse_z*resolution_x);
+        idx_y = int(item.y*inverse_z*resolution_y);
+        if(mapOfPoints.find(std::make_pair(idx_x, idx_y)) != mapOfPoints.end()){
+                //here goes the index update
+                i++;
+        }else{
+            mapOfPoints[std::make_pair(idx_x, idx_y)] = item.z;
+        }
+
+
+    }
+    cout << i << endl;
+    cout << "Computation finished!" << endl;
 }
 
 int main()
@@ -125,14 +157,14 @@ int main()
     string path = "D:/joci/projects/AImotive/Obstacle detection/Description/research_scientist_obstacle_data/";
 
     //camera model read
-    string calibPath = path + "calibration/" + CameraNames[0] + ".yaml";
+    string calibPath = path + "calibration/" + CameraNames[2] + ".yaml";
     CameraModel cameraModel(calibPath);
     uint16_t x,y = 0;
     cameraModel.GetResolution(x,y);
     cout << "Cameramodel loaded with resolution of: " << x << "x" << y << endl;
 
     //read points
-    string pointPath = path + "viewpoints/" + CameraNames[0] + "/00006526_viewpts.ply";
+    string pointPath = path + "viewpoints/" + CameraNames[2] + "/00006526_viewpts.ply";
     vector<glm::vec3> points;
     LoadPoints(pointPath, points);
     cout << "The number of points loaded: " << points.size() << endl;
