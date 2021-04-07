@@ -113,6 +113,7 @@ void LoadPoints(string pointPath, vector<glm::vec3>& points_out)
         }
         if(myText == "end_header"){startParse = true;}
     }
+    MyReadFile.close();
 }
 
 /** \brief
@@ -124,9 +125,9 @@ void LoadPoints(string pointPath, vector<glm::vec3>& points_out)
 */
 void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, std::vector<glm::vec3>& out_pts_visible, std::vector<int32_t>& out_idx)
 {
-    std::map<std::pair<int, int>, int > mapOfPoints;
-    int resolution_x = 1000;
-    int resolution_y = 1000;
+    std::map<std::pair<int, int>, MyPoint> mapOfPoints;
+    int resolution_x = 500;
+    int resolution_y = 500;
     bool itr;
     float inverse_z = 0.0f;
     int idx_x = 0;
@@ -139,15 +140,20 @@ void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, s
         idx_x = int(item.x*inverse_z*resolution_x);
         idx_y = int(item.y*inverse_z*resolution_y);
         if(mapOfPoints.find(std::make_pair(idx_x, idx_y)) != mapOfPoints.end()){
-                //here goes the index update
-                i++;
+            if(mapOfPoints[std::make_pair(idx_x, idx_y)].z_value > item.z){
+                mapOfPoints[std::make_pair(idx_x, idx_y)].idx = i;
+                mapOfPoints[std::make_pair(idx_x, idx_y)].z_value = item.z;
+            }
         }else{
-            mapOfPoints[std::make_pair(idx_x, idx_y)] = item.z;
+            mapOfPoints[std::make_pair(idx_x, idx_y)].idx = i;
+            mapOfPoints[std::make_pair(idx_x, idx_y)].z_value = item.z;
         }
-
-
+        i++;
     }
-    cout << i << endl;
+    for (auto const& x : mapOfPoints){
+        out_idx.push_back(x.second.idx);
+        out_pts_visible.push_back(pts_view[x.second.idx]);
+    }
     cout << "Computation finished!" << endl;
 }
 
@@ -173,6 +179,16 @@ int main()
     std::vector<glm::vec3> visiblePoints;
     std::vector<int32_t> visiblePoints_idx;
     filter(points, cameraModel, visiblePoints, visiblePoints_idx);
+    cout << "The number of visiblePoints: " << visiblePoints.size() << endl;
+    cout << "The number of visiblePoints_idx: " << visiblePoints_idx.size() << endl;
+
+    //output for test file
+    ofstream testFile("./test.txt");
+
+    for(glm::vec3 item : visiblePoints){
+        testFile << item.x << " " << item.y << " " << item.z << endl;
+    }
+    testFile.close();
 
     return 0;
 }
