@@ -5,9 +5,11 @@
 #include <bits/stdc++.h>
 
 using namespace std;
+using namespace std::chrono;
 
 //---- CONFIG ----
 #define CFG_TEST_FILE_CREATION      0
+#define CFG_MEAS_TIME               1
 //---- END CONFIG ----
 
 const std::string CameraNames[8]={"B_FISHEYE_C",
@@ -18,6 +20,10 @@ const std::string CameraNames[8]={"B_FISHEYE_C",
                             "M_FISHEYE_R",
                             "M_WINGMIRROR_L",
                             "M_WINGMIRROR_R"};
+
+const std::string ViewpointNames[3]={"00006526_viewpts.ply",
+                                    "00006606_viewpts.ply",
+                                    "00006726_viewpts.ply"};
 
 struct MyPoint{
         int idx;
@@ -194,31 +200,37 @@ void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, i
     //for mei model maybe absolute distant is better then only Z
 }
 
-int main()
-{
-    // general path definition
-    string path = "D:/joci/projects/AImotive/Obstacle detection/Description/research_scientist_obstacle_data/";
-
+void iterateThroughFiles(string path, string ptsFileName, int i){
     //camera model read
-    string calibPath = path + "calibration/" + CameraNames[0] + ".yaml";
+    string calibPath = path + "calibration/" + CameraNames[i] + ".yaml";
     CameraModel cameraModel(calibPath);
     uint16_t x,y = 0;
     cameraModel.GetResolution(x,y);
-    cout << "Cameramodel loaded with resolution of: " << x << "x" << y << endl;
+    //cout << "Cameramodel loaded with resolution of: " << x << "x" << y << endl;
 
     //read points
-    string pointPath = path + "viewpoints/" + CameraNames[0] + "/00006526_viewpts.ply";
+    string pointPath = path + "viewpoints/" + CameraNames[i] + "/" + ptsFileName;
     vector<glm::vec3> points;
     LoadPoints(pointPath, points);
-    cout << "The number of points loaded: " << points.size() << endl;
+    //cout << "The number of points loaded: " << points.size() << endl;
 
     //apply occlusion algorithm
     std::vector<glm::vec3> visiblePoints;
     std::vector<int32_t> visiblePoints_idx;
+#if CFG_MEAS_TIME
+    auto start = high_resolution_clock::now();
+#endif // CFG_MEAS_TIME
     filter(points, cameraModel, 500, 500, visiblePoints, visiblePoints_idx);
+#if CFG_MEAS_TIME
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<milliseconds>(stop - start);
+#endif // CFG_MEAS_TIME
     cout << "The number of visiblePoints: " << visiblePoints.size() << endl;
-    cout << "The number of visiblePoints_idx: " << visiblePoints_idx.size() << endl;
-
+#if CFG_MEAS_TIME
+    ofstream testFile("./log.txt", std::ios_base::app | std::ios_base::out);
+    testFile << "Calculation for " << CameraNames[i] << " on " << ptsFileName << " took: " << duration.count() << " ms" << endl;
+    testFile.close();
+#endif // CFG_MEAS_TIME
 #if CFG_TEST_FILE_CREATION
     //output for test file
     ofstream testFile("./test.txt");
@@ -228,6 +240,20 @@ int main()
     }
     testFile.close();
 #endif // CFG_TEST_FILE_CREATION
+
+}
+
+int main()
+{
+    // general path definition
+    string path = "D:/joci/projects/AImotive/Obstacle detection/Description/research_scientist_obstacle_data/";
+
+    for(int i=0;i<8;i++){
+        for(int j=0;j<3;j++){
+        iterateThroughFiles(path, ViewpointNames[j], i);
+        }
+    }
+
 
     return 0;
 }
