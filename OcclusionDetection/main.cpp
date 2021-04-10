@@ -6,6 +6,10 @@
 
 using namespace std;
 
+//---- CONFIG ----
+#define CFG_TEST_FILE_CREATION      0
+//---- END CONFIG ----
+
 const std::string CameraNames[8]={"B_FISHEYE_C",
                             "F_FISHEYE_C",
                             "F_STEREO_L",
@@ -19,9 +23,6 @@ struct MyPoint{
         int idx;
         float z_value;
 };
-
-
-
 
 class CameraModel{
 private:
@@ -93,8 +94,17 @@ public:
         x = image_resolution_px[0];
         y = image_resolution_px[1];
     }
+
+    bool IsPinholeModel(){
+        return model == false; // 'true' - mei, 'false' - opencv_pinhole
+    }
 };
 
+/** \brief
+* \param pointPath : file path for .ply file
+* \param points_out : loaded points stored in desired format (output)
+* \return none
+*/
 void LoadPoints(string pointPath, vector<glm::vec3>& points_out)
 {
     cout << "Points are loading..." << endl;
@@ -119,42 +129,69 @@ void LoadPoints(string pointPath, vector<glm::vec3>& points_out)
 /** \brief
 * \param pts_view : points in view coords (should only contain points in frustum, so that only needed points are in it)
 * \param camera_model : intrinsic calibration of the camera
+* \param resolution_x : define resolution for algorithm along x axis.
+* \param resolution_y : define resolution for algorithm along y axis.
 * \param out_pts_visible : points visible after filter (in view, output)
 * \param out_idx : kept point indexes (output)
 * \return none
 */
-void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, std::vector<glm::vec3>& out_pts_visible, std::vector<int32_t>& out_idx)
+void filter(const std::vector<glm::vec3>& pts_view, CameraModel& camera_model, int resolution_x, int resolution_y, std::vector<glm::vec3>& out_pts_visible, std::vector<int32_t>& out_idx)
 {
+    //---- local variables ----
     std::map<std::pair<int, int>, MyPoint> mapOfPoints;
-    int resolution_x = 500;
-    int resolution_y = 500;
     bool itr;
     float inverse_z = 0.0f;
     int idx_x = 0;
     int idx_y = 0;
     int i = 0;
     int x_max = 0;
-    cout << "Computation started..." << endl;
-    for(glm::vec3 item : pts_view){
-        inverse_z = 1/item.z;
-        idx_x = int(item.x*inverse_z*resolution_x);
-        idx_y = int(item.y*inverse_z*resolution_y);
-        if(mapOfPoints.find(std::make_pair(idx_x, idx_y)) != mapOfPoints.end()){
-            if(mapOfPoints[std::make_pair(idx_x, idx_y)].z_value > item.z){
+    float vec_length = 1.0f;
+
+    //---- algorithm for pinhole model ----
+    if(camera_model.IsPinholeModel()){
+        cout << "Computation for pinhole model started..." << endl;
+        for(glm::vec3 item : pts_view){
+            inverse_z = 1/item.z;
+            idx_x = int(item.x*inverse_z*resolution_x);
+            idx_y = int(item.y*inverse_z*resolution_y);
+            if(mapOfPoints.find(std::make_pair(idx_x, idx_y)) != mapOfPoints.end()){
+                if(mapOfPoints[std::make_pair(idx_x, idx_y)].z_value > item.z){
+                    mapOfPoints[std::make_pair(idx_x, idx_y)].idx = i;
+                    mapOfPoints[std::make_pair(idx_x, idx_y)].z_value = item.z;
+                }
+            }else{
                 mapOfPoints[std::make_pair(idx_x, idx_y)].idx = i;
                 mapOfPoints[std::make_pair(idx_x, idx_y)].z_value = item.z;
             }
-        }else{
-            mapOfPoints[std::make_pair(idx_x, idx_y)].idx = i;
-            mapOfPoints[std::make_pair(idx_x, idx_y)].z_value = item.z;
+            i++;
         }
-        i++;
+    }else{//---- algorithm for mei model ----
+        cout << "Computation for mei model started..." << endl;
+        for(glm::vec3 item : pts_view){
+            vec_length = glm::length(item);
+            inverse_z = 1/vec_length;
+            idx_x = int(item.x*inverse_z*resolution_x);
+            idx_y = int(item.y*inverse_z*resolution_y);
+            if(mapOfPoints.find(std::make_pair(idx_x, idx_y)) != mapOfPoints.end()){
+                if(mapOfPoints[std::make_pair(idx_x, idx_y)].z_value > vec_length){
+                    mapOfPoints[std::make_pair(idx_x, idx_y)].idx = i;
+                    mapOfPoints[std::make_pair(idx_x, idx_y)].z_value = vec_length;
+                }
+            }else{
+                mapOfPoints[std::make_pair(idx_x, idx_y)].idx = i;
+                mapOfPoints[std::make_pair(idx_x, idx_y)].z_value = vec_length;
+            }
+            i++;
+        }
     }
+    //---- store points in requested form ----
     for (auto const& x : mapOfPoints){
         out_idx.push_back(x.second.idx);
         out_pts_visible.push_back(pts_view[x.second.idx]);
     }
     cout << "Computation finished!" << endl;
+
+    //for mei model maybe absolute distant is better then only Z
 }
 
 int main()
@@ -163,14 +200,14 @@ int main()
     string path = "D:/joci/projects/AImotive/Obstacle detection/Description/research_scientist_obstacle_data/";
 
     //camera model read
-    string calibPath = path + "calibration/" + CameraNames[2] + ".yaml";
+    string calibPath = path + "calibration/" + CameraNames[0] + ".yaml";
     CameraModel cameraModel(calibPath);
     uint16_t x,y = 0;
     cameraModel.GetResolution(x,y);
     cout << "Cameramodel loaded with resolution of: " << x << "x" << y << endl;
 
     //read points
-    string pointPath = path + "viewpoints/" + CameraNames[2] + "/00006526_viewpts.ply";
+    string pointPath = path + "viewpoints/" + CameraNames[0] + "/00006526_viewpts.ply";
     vector<glm::vec3> points;
     LoadPoints(pointPath, points);
     cout << "The number of points loaded: " << points.size() << endl;
@@ -178,10 +215,11 @@ int main()
     //apply occlusion algorithm
     std::vector<glm::vec3> visiblePoints;
     std::vector<int32_t> visiblePoints_idx;
-    filter(points, cameraModel, visiblePoints, visiblePoints_idx);
+    filter(points, cameraModel, 500, 500, visiblePoints, visiblePoints_idx);
     cout << "The number of visiblePoints: " << visiblePoints.size() << endl;
     cout << "The number of visiblePoints_idx: " << visiblePoints_idx.size() << endl;
 
+#if CFG_TEST_FILE_CREATION
     //output for test file
     ofstream testFile("./test.txt");
 
@@ -189,6 +227,7 @@ int main()
         testFile << item.x << " " << item.y << " " << item.z << endl;
     }
     testFile.close();
+#endif // CFG_TEST_FILE_CREATION
 
     return 0;
 }
